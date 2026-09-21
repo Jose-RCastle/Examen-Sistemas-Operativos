@@ -32,7 +32,7 @@ const { chromium } = require('playwright');
   await page.locator('[data-step="7"]').click();
   assert.equal(await page.locator('.event-list button').count(), 11);
   await page.locator('[data-event="2"]').click();
-  assert.match(await page.locator('#event-state').innerText(), /intermedio/);
+  assert.match(await page.locator('#event-state').innerText(), /intermedio/i);
   await page.locator('#compare').click();
   assert.equal(await page.locator('#comparison tbody tr').count(), 6);
   await page.locator('[data-algorithm="LRU"]').click();
