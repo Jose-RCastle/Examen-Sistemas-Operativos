@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#182c2b">
+  <title>Laboratorio MMU · Paginación paso a paso</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="js/engine.js" defer></script>
+  <script src="js/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="Laboratorio MMU, inicio"><span class="brand-mark">μ</span><span>Laboratorio <strong>MMU</strong><small>SISTEMAS OPERATIVOS</small></span></a>
+    <span class="offline"><span></span> Disponible sin conexión</span>
+  </header>
+  <main>
+    <section class="intro">
+      <div><p class="eyebrow">TU MESA DE PRÁCTICA</p><h1>Cada referencia, una decisión.</h1><p>Resuelve la paginación y sigue cada cambio de memoria, como en clase.</p></div>
+      <button class="quiet" id="help-button" type="button">Cómo usarlo <span aria-hidden="true">↗</span></button>
+    </section>
+    <section id="help" class="help panel" hidden>
+      <h2>Del enunciado a la tabla</h2>
+      <ol><li>Pega las referencias en su orden original y define los marcos.</li><li>Elige el algoritmo. Revisa sus convenciones, especialmente en NRU.</li><li>Resuelve y selecciona cualquier columna para explicar esa decisión.</li><li>Usa «Imprimir / PDF» para obtener todas las columnas en bloques legibles.</li></ol>
+      <p>Un marco vacío se muestra como «—». Cargar una página ausente siempre cuenta como fallo, aunque haya espacio libre. Una repetición es un acierto si esa misma página sigue en memoria.</p>
+      <p>R = referenciada. M = modificada. Una lectura pone R=1; una escritura pone R=1 y M=1. M se conserva hasta que la página sale. Los resultados dependen de las condiciones del ejercicio.</p>
+    </section>
+    <div class="workspace">
+      <aside class="panel setup">
+        <div class="section-label"><span class="step-dot">01</span><h2>Tu ejercicio</h2></div>
+        <form id="exercise-form" novalidate>
+          <label for="example">Cargar un ejemplo</label>
+          <select id="example"><option value="">Elegir ejercicio…</option><option value="fifo4">Clase · FIFO / 4 marcos</option><option value="fifo5">Clase · Belady / 5 marcos</option><option value="lru">Clase · LRU / 3 marcos</option><option value="clock">Clase · Reloj / 4 marcos</option><option value="opt">Óptimo / 3 marcos</option><option value="nru">NRU · lecturas y escrituras</option><option value="long">Práctica · 40 referencias</option></select>
+          <div class="label-line"><label for="references">Cadena de referencias</label><span id="reference-count">15 referencias</span></div>
+          <textarea id="references" rows="4" spellcheck="false" aria-describedby="reference-hint">2, 4, 6, 5, 1, 2, 4, 3, 3, 2, 4, 6, 5, 1, 3</textarea>
+          <p class="hint" id="reference-hint">Separa con espacios, comas o saltos de línea. <code>2:W</code> o <code>2w</code> indica escritura; sin sufijo es lectura. También acepta etiquetas como P1.</p>
+          <div class="input-row"><div><label for="frames">Marcos físicos</label><input id="frames" type="number" min="1" max="64" step="1" value="4"></div><div><label for="algorithm">Algoritmo</label><select id="algorithm"><option value="FIFO">FIFO</option><option value="OPT">Óptimo</option><option value="LRU">LRU</option><option value="NRU">NRU</option><option value="SC">Segunda oportunidad</option><option value="CLOCK">Reloj (Clock)</option></select></div></div>
+          <p id="algorithm-hint" class="algorithm-note"></p>
+          <fieldset id="nru-options" hidden>
+            <legend>Reglas de NRU</legend>
+            <label for="reset-every">Reiniciar R cada cuántas referencias</label><input id="reset-every" type="number" min="0" max="2000" step="1" value="0">
+            <p class="hint">0 = sin reinicio periódico. Ajusta este valor al enunciado; M no se reinicia.</p>
+            <label for="reset-timing">Momento del reinicio</label><select id="reset-timing"><option value="before">Antes de la siguiente referencia del bloque</option><option value="after">Después de la última referencia del bloque</option></select>
+            <p class="hint">Con intervalo 4: antes de 5, 9… o después de 4, 8… La decisión siguiente coincide; la tabla de bits intermedia cambia.</p>
+            <label for="nru-tie">Desempate dentro de la clase</label><select id="nru-tie"><option value="random">Sorteo con semilla (NRU clásico)</option><option value="frame">Menor número de marco (convención)</option><option value="fifo">Página más antigua (convención)</option></select>
+            <label for="seed">Semilla del sorteo</label><input id="seed" type="number" min="0" max="4294967295" step="1" value="2026">
+            <p class="hint">La misma semilla permite repetir exactamente la selección. Si la clase admite un sorteo libre, puede haber varias tablas válidas.</p>
+          </fieldset>
+          <details class="advanced"><summary>Condiciones iniciales</summary>
+            <label for="initial">Memoria inicial (opcional)</label><textarea id="initial" rows="2" spellcheck="false" placeholder="Vacío = todos los marcos libres"></textarea>
+            <p class="hint">Una entrada por marco: <code>página:R:M</code>, o <code>-</code> para vacío. Ejemplo: <code>1:1:0 2:0:1 -</code>. Sin bits, se usa 0.</p>
+            <p class="hint">Para fijar antigüedad: <code>página:R:M:carga:uso</code>, con instantes ≤ 0 y carga ≤ uso. Por defecto, los marcos menores son más antiguos. Las referencias nuevas comienzan en 1.</p>
+            <div id="hand-options" hidden><label for="hand">Puntero inicial de Reloj (marco)</label><input id="hand" type="number" min="1" max="64" step="1" value="1"></div>
+          </details>
+          <p id="error" class="error" role="alert" hidden></p>
+          <button class="primary solve" type="submit">Resolver ejercicio <span aria-hidden="true">→</span></button>
+          <button class="quiet full" id="clear" type="button">Limpiar ejercicio</button>
+          <p class="limit-note">Hasta 2,000 referencias · 1–64 marcos</p>
+        </form>
+        <div class="file-actions"><button type="button" id="save">Guardar ejercicio</button><button type="button" id="import">Abrir ejercicio</button><input id="file" type="file" accept=".json,application/json" hidden></div>
+      </aside>
+      <div class="results-column">
+        <section id="empty" class="panel empty"><span class="empty-symbol" aria-hidden="true">▦</span><h2>Tu tabla empieza aquí</h2><p>Ya tienes el ejemplo de FIFO de la clase cargado.<br>Presiona «Resolver ejercicio» para comprobar sus 11 fallos.</p><span class="mini-tag">Las referencias se conservan exactamente</span></section>
+        <div id="results" hidden>
+          <div id="stale" class="stale" role="status" hidden>Hay cambios en el ejercicio. Presiona «Resolver ejercicio» para actualizar esta tabla.</div>
+          <section class="panel result-panel">
+            <div class="result-heading"><div><p class="eyebrow">RESULTADO COMPLETO</p><h2 id="result-title">FIFO</h2></div><div class="result-actions"><button id="compare" type="button">Comparar los 6</button><button id="print" type="button">Imprimir / PDF</button><button id="csv" type="button">CSV</button></div></div>
+            <p class="conditions" id="conditions"></p>
+            <div class="stats" id="stats"></div>
+            <p id="formula" class="formula"></p>
+            <div id="comparison" class="comparison" hidden></div>
+            <div class="table-heading"><h3>Desarrollo de la paginación</h3><span><i class="key fault-key"></i> Fallo <i class="key hit-key"></i> Acierto</span></div>
+            <p class="hint">Cada columna muestra la memoria después de atender esa referencia. Selecciona su número para ver la explicación.</p>
+            <div id="matrix" class="matrix-scroll" tabindex="0" role="region" aria-label="Tabla de paginación con desplazamiento horizontal"></div>
+            <div class="playback"><div class="transport"><button id="first" type="button" aria-label="Estado inicial">⏮</button><button id="prev" type="button" aria-label="Referencia anterior">←</button><button id="play" type="button">Reproducir</button><button id="next" type="button" aria-label="Referencia siguiente">→</button><button id="last" type="button" aria-label="Última referencia">⏭</button></div><span id="position" class="position">Inicio</span><label class="speed">Velocidad<select id="speed"><option value="1200">1×</option><option value="600">2×</option><option value="250">4×</option></select></label></div>
+            <label class="sr-only" for="seek">Referencia seleccionada</label><input type="range" id="seek" min="0" max="15" value="0">
+            <label class="checkbox"><input type="checkbox" id="progressive"> Ocultar las referencias que aún no he recorrido</label>
+            <label class="checkbox" id="bits-label" hidden><input type="checkbox" id="show-bits"> Mostrar bits R/M en la tabla y en la impresión</label>
+          </section>
+          <section class="panel detail-panel">
+            <div class="section-label"><span class="step-dot">02</span><h2 id="detail-title">Qué ocurre en este paso</h2><span id="detail-status" class="status"></span></div>
+            <div id="detail-body"></div>
+          </section>
+          <details class="panel rules"><summary>Reglas usadas y cómo leer el resultado</summary><div id="rules-content"></div><p>«Rendimiento» aquí significa porcentaje de aciertos, según los ejercicios de clase. No es una medida del tiempo real de un sistema operativo.</p><p>Reloj y Segunda oportunidad pueden producir la misma secuencia de reemplazos con condiciones equivalentes. Eso es esperable. NRU depende de sus bits y de la regla de desempate.</p></details>
+        </div>
+      </div>
+    </div>
+    <footer>Laboratorio MMU <span>Hecho para seguir el razonamiento, referencia por referencia.</span><a href="README.md">Guía del proyecto</a></footer>
+  </main>
+  <div id="print-area" aria-hidden="true"></div>
+  <div id="notice" class="notice" role="status" hidden></div>
+  <noscript>Activa JavaScript en el navegador para ejecutar el simulador.</noscript>
+</body>
+</html>
