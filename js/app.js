@@ -10,8 +10,8 @@
     OPT: "Sale la página cuyo próximo uso está más lejos en el futuro, o que no vuelve a usarse.",
     LRU: "Sale la página que lleva más referencias sin usarse. Cada acierto actualiza su último uso.",
     NRU: "Se elige en la clase R/M más baja: 0=(0,0), 1=(0,1), 2=(1,0), 3=(1,1). Configura el reinicio y el desempate según el enunciado.",
-    SC: "La cola da otra oportunidad a una página con R=1: pone R=0 y la envía al final. Sale la primera con R=0.",
-    CLOCK: "El puntero recorre los marcos: limpia R=1 y avanza; reemplaza al encontrar R=0. No se mueve en los aciertos."
+    SC: "Convención de clase: una página nueva entra con R=0. Un acierto pone R=1; al revisar R=1 se limpia y la página pasa al final de la cola.",
+    CLOCK: "Convención de clase: una página nueva entra con R=1. El puntero queda quieto al llenar huecos y en los aciertos; se mueve al buscar y reemplazar."
   };
   const examples = {
     fifo4: { algorithm: "FIFO", frameCount: 4, references: "2 4 6 5 1 2 4 3 3 2 4 6 5 1 3" },
@@ -34,7 +34,7 @@
     return M.normalize({
       algorithm, frameCount, references: $("references").value,
       resetEvery: numeric("reset-every"), resetTiming: $("reset-timing").value,
-      nruTie: $("nru-tie").value, seed: numeric("seed"),
+      nruTie: $("nru-tie").value, seed: numeric("seed"), nruFaultWrites: $("nru-fault-writes").checked,
       hand: algorithm === "CLOCK" ? numeric("hand") - 1 : 0,
       initialFrames: M.parseInitial($("initial").value, frameCount)
     });
@@ -43,7 +43,7 @@
     $("references").value = config.references.map(labelRef).join(", ");
     $("algorithm").value = config.algorithm; $("frames").value = config.frameCount;
     $("reset-every").value = config.resetEvery; $("reset-timing").value = config.resetTiming;
-    $("nru-tie").value = config.nruTie; $("seed").value = config.seed; $("hand").value = config.hand + 1;
+    $("nru-tie").value = config.nruTie; $("seed").value = config.seed; $("nru-fault-writes").checked = config.nruFaultWrites; $("hand").value = config.hand + 1;
     $("initial").value = config.initialFrames.some(Boolean) ? config.initialFrames.map(f => f ? `${f.page}:${f.r}:${f.m}:${f.loadedAt}:${f.lastUsed}` : "-").join(" ") : "";
     updateInputs();
   }
@@ -82,8 +82,9 @@
     if (c.algorithm === "NRU") {
       text += ` · R: ${c.resetEvery ? `reinicio cada ${c.resetEvery}, ${c.resetTiming === "before" ? "antes del bloque siguiente" : "al final del bloque"}` : "sin reinicio periódico"}`;
       text += ` · Desempate: ${{ frame: "menor marco", fifo: "más antigua", random: `sorteo, semilla ${c.seed}` }[c.nruTie]}`;
+      text += ` · M: ${c.nruFaultWrites ? "cada fallo cuenta como modificación (clase)" : "solo escrituras :W"}`;
     } else if (c.algorithm === "CLOCK") text += ` · Puntero inicial: marco ${c.hand + 1} · Sin reinicio periódico de R`;
-    else if (c.algorithm === "SC") text += " · Sin reinicio periódico de R";
+    else if (c.algorithm === "SC") text += " · Página nueva: R=0 · Sin reinicio periódico";
     else if (c.algorithm === "OPT" || c.algorithm === "LRU") text += " · Empates: menor número de marco";
     return text;
   }
@@ -201,7 +202,9 @@
   }
   function renderRules() {
     const c = result.config;
-    $("rules-content").innerHTML = `<p>${esc(descriptions[c.algorithm])}</p><ul><li>${esc(conditions(c))}.</li><li>Marcos y referencias se numeran desde 1. Las etiquetas de página se conservan; 0 es una página válida. Las etiquetas distinguen mayúsculas y ceros iniciales: P1 ≠ p1 y 01 ≠ 1.</li><li>${c.algorithm === "CLOCK" ? "Los marcos vacíos se buscan desde el puntero. Tras cargar o reemplazar, el puntero avanza un marco; en un acierto no avanza." : "Se llena primero el marco libre de menor número."}</li><li>Se pone R=1 al completar cada acceso. Solo una escritura pone M=1; leer una página modificada no limpia M.</li><li>${c.algorithm === "NRU" ? "Solo NRU usa el reinicio periódico configurado de R." : "No hay un reinicio periódico adicional de R. Reloj y Segunda oportunidad limpian R durante su búsqueda."}</li><li>Una página permanece en memoria hasta su reemplazo. Terminar la cadena no libera marcos.</li><li>Los porcentajes se calculan con los conteos completos; se redondean solo al mostrarlos.</li></ul>`;
+    const rRule = c.algorithm === "SC" ? "En Segunda oportunidad, una carga entra con R=0 y un acierto pone R=1." : "En este algoritmo, una carga o un acierto deja R=1.";
+    const mRule = c.algorithm === "NRU" && c.nruFaultWrites ? "Por la convención de clase seleccionada, cada fallo deja M=1." : "Solo una escritura :W pone M=1; una lectura no lo limpia.";
+    $("rules-content").innerHTML = `<p>${esc(descriptions[c.algorithm])}</p><ul><li>${esc(conditions(c))}.</li><li>Marcos y referencias se numeran desde 1. Las etiquetas de página se conservan; 0 es una página válida. Las etiquetas distinguen mayúsculas y ceros iniciales: P1 ≠ p1 y 01 ≠ 1.</li><li>${c.algorithm === "CLOCK" ? "Los huecos se llenan desde el marco menor sin mover el puntero. El puntero se mueve al evaluar y después del reemplazo; en un acierto no avanza." : "Se llena primero el marco libre de menor número."}</li><li>${rRule} ${mRule}</li><li>${c.algorithm === "NRU" ? "Solo NRU usa el reinicio periódico configurado de R." : "No hay un reinicio periódico adicional de R. Reloj y Segunda oportunidad limpian R durante su búsqueda."}</li><li>Una página permanece en memoria hasta su reemplazo. Terminar la cadena no libera marcos.</li><li>Los porcentajes se calculan con los conteos completos; se redondean solo al mostrarlos.</li></ul>`;
   }
   function move(next) {
     if (stale || !result) return;
@@ -235,7 +238,7 @@
     stop(); preparePrint(); window.print();
   }
   $("exercise-form").addEventListener("submit", e => { e.preventDefault(); solve(); });
-  for (const id of ["references", "frames", "algorithm", "reset-every", "reset-timing", "nru-tie", "seed", "initial", "hand"]) $(id).addEventListener("input", dirty);
+  for (const id of ["references", "frames", "algorithm", "reset-every", "reset-timing", "nru-tie", "seed", "nru-fault-writes", "initial", "hand"]) $(id).addEventListener("input", dirty);
   $("example").addEventListener("change", () => {
     if (!examples[$("example").value]) return;
     const config = M.normalize(examples[$("example").value]); applyConfig(config); solve(config);

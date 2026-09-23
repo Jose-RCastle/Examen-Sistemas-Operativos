@@ -57,7 +57,7 @@ Cambiar un dato marca el resultado anterior como pendiente de actualizar. Pulsa 
 | Misma cadena, anomalía de Belady | 5 | 12 | 3 | 20.00 % |
 | LRU de clase, 12 referencias | 3 | 6 | 6 | 50.00 % |
 | Reloj de clase, 12 referencias, sin reinicio periódico de R | 4 | 10 | 2 | 16.67 % |
-| Segunda oportunidad, misma cadena del reloj | 4 | 10 | 2 | 16.67 % |
+| Segunda oportunidad, misma cadena del reloj y convención de clase R=0 al cargar | 4 | 8 | 4 | 33.33 % |
 | Óptimo, ejemplo OSTEP de 11 referencias | 3 | 5 | 6 | 54.55 % |
 
 El ejemplo de NRU incluido es una práctica construida para mostrar lecturas, escrituras y reinicio de R; **no se presenta como una solución confirmada del profesor**.

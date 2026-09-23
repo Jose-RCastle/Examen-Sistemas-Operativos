@@ -8,7 +8,7 @@ La numeración visual de marcos y referencias empieza en 1. Los índices interno
 
 La identidad de la página es textual y distingue mayúsculas y ceros iniciales. No se agrupan páginas de procesos diferentes automáticamente. Si el ejercicio usa identificadores compuestos, usa etiquetas distintas, como `P1_0` y `P2_0`.
 
-En cada acceso completado se pone R=1. Una escritura pone M=1; una lectura conserva M. Una carga por lectura inicia M=0. La página expulsada con M=1 produce un evento de escritura a disco, sin añadir otra referencia ni otro fallo. No se simulan latencias ni escritura anticipada a disco.
+Como convención general, una escritura pone M=1 y una lectura conserva M. La convención especial de Segunda oportunidad usada en el curso carga una página con R=0; un acierto posterior pone R=1. Los demás algoritmos cargan con R=1. En NRU se puede activar la regla de clase donde cada carga por fallo también pone M=1. La página expulsada con M=1 produce un evento de escritura a disco, sin añadir otra referencia ni otro fallo.
 
 Cada columna muestra el estado después de completar la referencia y, en NRU si corresponde, el reinicio posterior de bits. Las acciones intermedias son instantáneas independientes. Retroceder no recalcula ni sortea de nuevo.
 
@@ -32,19 +32,19 @@ Los instantes iniciales deben cumplir carga ≤ uso ≤ 0. Las referencias de la
 | FIFO | Cola por orden de carga; sale la primera. | Cargas iniciales con misma fecha: menor marco primero. Un acierto no mueve la cola. |
 | Óptimo | Sale la página cuyo próximo uso está más lejos; sin uso futuro equivale a distancia infinita. | Menor marco si dos candidatas no vuelven a aparecer. |
 | LRU | Sale la página con instante de último uso más antiguo. | Menor marco en empate inicial. Cada acierto actualiza el uso. |
-| NRU | Se toma la clase no vacía menor, calculada como 2R+M. | Sorteo reproducible por defecto. También se ofrecen menor marco o antigüedad como convenciones explícitas. |
-| Segunda oportunidad | Examina la cabeza de la cola. R=1 pasa a R=0 y al final; R=0 es víctima. | Se empieza por orden de carga; cada carga nueva queda al final. Un acierto solo actualiza bits y uso. |
-| Reloj | Desde la mano: R=1 se limpia y se avanza; R=0 es víctima. | Puntero inicial configurable. Tras carga/reemplazo avanza; en acierto permanece. |
+| NRU | Se toma la clase no vacía menor, calculada como 2R+M. | Por defecto desempata con el primer marco, como indicó el profesor. También ofrece sorteo o antigüedad. |
+| Segunda oportunidad | La carga entra con R=0. En un acierto R pasa a 1. Al reemplazar, R=1 se limpia y pasa al final; R=0 es víctima. | Se empieza por orden de carga; cada carga nueva queda al final. |
+| Reloj | La carga entra con R=1. Desde la mano: R=1 se limpia y se avanza; R=0 es víctima. | El puntero queda quieto al llenar huecos y en los aciertos; tras un reemplazo avanza. |
 
-En FIFO, LRU, Óptimo, NRU y Segunda oportunidad se ocupa el hueco con menor número. En Reloj se busca el primer hueco desde la mano en orden circular. Esto permite representar un puntero inicial distinto y memoria precargada.
-
-Segunda oportunidad y Reloj se implementan con estados diferentes (cola y mano circular), pero con memoria inicialmente vacía y el orden equivalente pueden dar las mismas víctimas. No se introduce una diferencia artificial entre ellos.
+Los seis algoritmos ocupan primero el hueco con menor número. En Reloj, esto no mueve el puntero. La diferencia R=0/R=1 entre Segunda oportunidad y Reloj es la explicada expresamente por el profesor y puede producir tablas distintas.
 
 ## NRU: datos que cambian la respuesta
 
 Las clases son 0: R=0/M=0; 1: R=0/M=1; 2: R=1/M=0; 3: R=1/M=1.
 
-El NRU clásico selecciona al azar dentro de la clase menor disponible. Esta app usa un generador pseudoaleatorio reproducible Mulberry32 y una semilla de 32 bits. La semilla fija una ejecución, pero no convierte esa tabla en la única respuesta NRU válida. Las alternativas “menor marco” y “página más antigua” son convenciones didácticas, no una afirmación de que el profesor las use.
+El curso desempata eligiendo el primer marco de la clase menor, por lo que esa es la opción predeterminada. La app también ofrece el sorteo del NRU clásico y la antigüedad de carga cuando un enunciado use otra convención.
+
+El interruptor “cada carga por fallo pone M=1” reproduce la explicación de clase donde un fallo o reemplazo cuenta como modificación. Apagado, M solo cambia mediante referencias `:W`, que corresponde a la convención habitual de lectura/escritura.
 
 El intervalo de reinicio de R se mide aquí en **número de referencias**, no en tiempo de CPU. 0 desactiva el reinicio periódico. Este valor se muestra siempre en el resultado de NRU y debe ajustarse al enunciado.
 

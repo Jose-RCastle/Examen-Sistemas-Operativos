@@ -62,9 +62,11 @@
     const resetEvery = integer(input.resetEvery ?? 0, 0, LIMITS.references, "Intervalo de reinicio de R");
     const resetTiming = input.resetTiming ?? "before";
     if (!["before", "after"].includes(resetTiming)) throw new Error("Momento de reinicio inválido.");
-    const nruTie = input.nruTie ?? "random";
+    const nruTie = input.nruTie ?? "frame";
     if (!["random", "frame", "fifo"].includes(nruTie)) throw new Error("Desempate NRU inválido.");
     const seed = integer(input.seed ?? 2026, 0, 4294967295, "Semilla");
+    const nruFaultWrites = input.nruFaultWrites ?? false;
+    if (typeof nruFaultWrites !== "boolean") throw new Error("La convención de modificación NRU debe ser verdadera o falsa.");
     const hand = integer(input.hand ?? 0, 0, frameCount - 1, "Puntero (índice desde cero)");
     const initialInput = input.initialFrames ?? [];
     if (!Array.isArray(initialInput) || initialInput.length > frameCount) throw new Error("Memoria inicial inválida.");
@@ -79,7 +81,7 @@
       const lastUsed = integer(f.lastUsed ?? i - frameCount, loadedAt, 0, "Instante inicial de último uso");
       return { page, r: integer(f.r ?? 0, 0, 1, "Bit R"), m: integer(f.m ?? 0, 0, 1, "Bit M"), loadedAt, lastUsed };
     });
-    return { algorithm, frameCount, references, resetEvery, resetTiming, nruTie, seed, hand, initialFrames };
+    return { algorithm, frameCount, references, resetEvery, resetTiming, nruTie, seed, nruFaultWrites, hand, initialFrames };
   }
   function randomGenerator(seed) {
     let a = seed >>> 0;
@@ -123,10 +125,6 @@
         event("fault", `Fallo: la página ${reference.page} no está en memoria.`);
         frame = frames.findIndex(f => f === null);
         if (frame >= 0) {
-          if (algorithm === "CLOCK") {
-            frame = hand;
-            while (frames[frame] !== null) frame = (frame + 1) % frameCount;
-          }
           event("free", `Se usa el marco ${frame + 1}, que está vacío. La carga inicial también cuenta como fallo.`, frame);
         } else {
           if (algorithm === "FIFO") {
@@ -181,14 +179,16 @@
             event("writeback", `La página ${victim.page} tiene M=1: requiere escritura a disco antes de reemplazarla. No se añade otra referencia ni otro fallo.`, frame);
           }
         }
-        frames[frame] = { page: reference.page, r: 1, m: reference.write ? 1 : 0, loadedAt: i + 1, lastUsed: i + 1 };
+        const loadedR = algorithm === "SC" ? 0 : 1;
+        const loadedM = reference.write || (algorithm === "NRU" && config.nruFaultWrites) ? 1 : 0;
+        frames[frame] = { page: reference.page, r: loadedR, m: loadedM, loadedAt: i + 1, lastUsed: i + 1 };
         if (algorithm === "FIFO" || algorithm === "SC") {
           const oldIndex = queue.indexOf(frame);
           if (oldIndex >= 0) queue.splice(oldIndex, 1);
           queue.push(frame);
         }
-        if (algorithm === "CLOCK") hand = (frame + 1) % frameCount;
-        event("load", `Se carga ${reference.page} en el marco ${frame + 1}: R=1, M=${reference.write ? 1 : 0}.${algorithm === "CLOCK" ? ` El puntero queda en el marco ${hand + 1}.` : ""}`, frame);
+        if (algorithm === "CLOCK" && victim) hand = (frame + 1) % frameCount;
+        event("load", `Se carga ${reference.page} en el marco ${frame + 1}: R=${loadedR}, M=${loadedM}.${algorithm === "CLOCK" ? ` El puntero queda en el marco ${hand + 1}.` : ""}`, frame);
       }
       if (algorithm === "NRU" && config.resetEvery && config.resetTiming === "after" && (i + 1) % config.resetEvery === 0) clearBits();
       steps.push({ index: i + 1, reference: { ...reference }, hit, frame, victim, candidates, before, after: snapshot(), events, faults, hits, replacements, writebacks });

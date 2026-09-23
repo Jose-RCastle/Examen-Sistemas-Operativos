@@ -41,13 +41,19 @@ const clockStates = [
   ['1','2','3','4'], ['1','2','3','4'], ['5','2','3','4'], ['5','1','3','4'],
   ['5','1','2','4'], ['5','1','2','3'], ['4','1','2','3'], ['4','5','2','3']
 ];
-for (const algorithm of ['CLOCK', 'SC']) test(`${algorithm}: clase, 10 fallos y transiciones R=1 → R=0 antes de reemplazar`, () => {
-  const r = run(algorithm, '1 2 3 4 1 2 5 1 2 3 4 5', 4, { resetEvery: 5 });
+test('Reloj de clase: carga con R=1 y reproduce 10 fallos', () => {
+  const r = run('CLOCK', '1 2 3 4 1 2 5 1 2 3 4 5', 4);
   assert.deepEqual(pages(r), clockStates); assert.equal(r.totals.faults, 10);
   assert.equal(r.steps[6].events.filter(e => e.type === 'clear').length, 4);
   assert.deepEqual(r.steps[6].events.filter(e => e.type === 'clear').at(-1).frames.map(f => f.r), [0,0,0,0]);
   assert.deepEqual(r.steps[6].after.frames.map(f => f.r), [1,0,0,0]);
   assert.ok(r.steps.every(s => !s.events.some(e => e.type === 'reset')));
+});
+test('Segunda oportunidad de clase: carga con R=0; un acierto la cambia a R=1', () => {
+  const r = run('SC', '1 2 3 4 1 2 5 1 2 3 4 5', 4);
+  assert.equal(r.steps[0].after.frames[0].r,0);
+  assert.equal(r.steps[4].after.frames[0].r,1);
+  assert.equal(r.totals.faults,8); assert.equal(r.totals.hits,4);
 });
 test('Óptimo: ejemplo OSTEP, 5 fallos; empate de páginas sin futuro al menor marco', () => {
   const r = run('OPT', '0 1 2 0 1 3 0 3 1 2 1', 3);
@@ -102,13 +108,19 @@ test('Leer no borra M; una página modificada se escribe al salir, sin un fallo 
   assert.equal(r.totals.writebacks,1); assert.equal(r.totals.faults,3);
   assert.equal(r.steps[3].after.frames[0].m,0);
 });
+test('NRU permite la convención de clase donde cada fallo deja M=1', () => {
+  const r=run('NRU','1 2 1',2,{nruFaultWrites:true,nruTie:'frame'});
+  assert.deepEqual(r.steps[0].after.frames.map(f=>f?.m??null),[1,null]);
+  assert.deepEqual(r.steps[1].after.frames.map(f=>f?.m??null),[1,1]);
+  assert.equal(r.steps[2].after.frames[0].m,1);
+});
 test('Reloj: posición inicial, acierto sin mover la mano y uso de huecos', () => {
   const r=run('CLOCK','A B A C D',3,{hand:1});
-  assert.equal(r.steps[0].frame,1); assert.equal(r.steps[1].frame,2);
-  assert.equal(r.steps[2].after.hand,0); assert.equal(r.steps[3].frame,0);
-  assert.equal(r.steps[4].victim.page,'A');
+  assert.equal(r.steps[0].frame,0); assert.equal(r.steps[1].frame,1);
+  assert.equal(r.steps[2].after.hand,1); assert.equal(r.steps[3].frame,2);
+  assert.equal(r.steps[4].victim.page,'B');
   const preload=run('CLOCK','C',3,{hand:2,initialFrames:[null,{page:'A'},null]});
-  assert.equal(preload.steps[0].frame,2);
+  assert.equal(preload.steps[0].frame,0); assert.equal(preload.steps[0].after.hand,2);
 });
 test('La memoria inicial no cuenta como referencias; antigüedad y últimos usos se respetan', () => {
   const initialFrames=[{page:'A',loadedAt:-3,lastUsed:0},{page:'B',loadedAt:-2,lastUsed:-1}];
@@ -167,7 +179,7 @@ test('Óptimo coincide con un oráculo exhaustivo en todas las cadenas de longit
     for(const capacity of [1,2,3]) assert.equal(run('OPT',refs.join(' '),capacity).totals.faults,minimumFaults(refs,capacity));
   }
 });
-test('Invariantes y Segunda oportunidad/Reloj equivalentes en 120 cadenas de 40 referencias', () => {
+test('Invariantes de los seis algoritmos en 120 cadenas de 40 referencias', () => {
   let seed=731; const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed;};
   for(let k=0;k<120;k++) {
     const capacity=1+random()%6, refs=Array.from({length:40},()=>String(random()%9)).join(' ');
@@ -184,7 +196,6 @@ test('Invariantes y Segunda oportunidad/Reloj equivalentes en 120 cadenas de 40 
         if(s.victim)assert.equal(before.length,capacity);
       });
     }
-    assert.deepEqual(pages(runs.find(r=>r.config.algorithm==='SC')),pages(runs.find(r=>r.config.algorithm==='CLOCK')));
   }
 });
 test('Todos los algoritmos: un marco, repetición constante y espacio suficiente', () => {

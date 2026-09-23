@@ -23,7 +23,7 @@
       <h2>Del enunciado a la tabla</h2>
       <ol><li>Pega las referencias en su orden original y define los marcos.</li><li>Elige el algoritmo. Revisa sus convenciones, especialmente en NRU.</li><li>Resuelve y selecciona cualquier columna para explicar esa decisión.</li><li>Usa «Imprimir / PDF» para obtener todas las columnas en bloques legibles.</li></ol>
       <p>Un marco vacío se muestra como «—». Cargar una página ausente siempre cuenta como fallo, aunque haya espacio libre. Una repetición es un acierto si esa misma página sigue en memoria.</p>
-      <p>R = referenciada. M = modificada. Una lectura pone R=1; una escritura pone R=1 y M=1. M se conserva hasta que la página sale. Los resultados dependen de las condiciones del ejercicio.</p>
+      <p>R = referenciada. M = modificada. La aplicación incluye las convenciones particulares usadas en clase: Segunda oportunidad carga con R=0 y Reloj carga con R=1. En NRU puedes indicar si el ejercicio trata cada fallo como modificación.</p>
     </section>
     <div class="workspace">
       <aside class="panel setup">
@@ -42,9 +42,11 @@
             <p class="hint">0 = sin reinicio periódico. Ajusta este valor al enunciado; M no se reinicia.</p>
             <label for="reset-timing">Momento del reinicio</label><select id="reset-timing"><option value="before">Antes de la siguiente referencia del bloque</option><option value="after">Después de la última referencia del bloque</option></select>
             <p class="hint">Con intervalo 4: antes de 5, 9… o después de 4, 8… La decisión siguiente coincide; la tabla de bits intermedia cambia.</p>
-            <label for="nru-tie">Desempate dentro de la clase</label><select id="nru-tie"><option value="random">Sorteo con semilla (NRU clásico)</option><option value="frame">Menor número de marco (convención)</option><option value="fifo">Página más antigua (convención)</option></select>
+            <label for="nru-tie">Desempate dentro de la clase</label><select id="nru-tie"><option value="frame" selected>Primer marco / menor número (clase)</option><option value="random">Sorteo con semilla (NRU clásico)</option><option value="fifo">Página más antigua (convención)</option></select>
             <label for="seed">Semilla del sorteo</label><input id="seed" type="number" min="0" max="4294967295" step="1" value="2026">
             <p class="hint">La misma semilla permite repetir exactamente la selección. Si la clase admite un sorteo libre, puede haber varias tablas válidas.</p>
+            <label class="checkbox"><input id="nru-fault-writes" type="checkbox"> Convención de clase: cada carga por fallo pone M=1</label>
+            <p class="hint">Actívalo cuando el ejercicio trate un fallo/reemplazo como modificación. Si el enunciado marca lecturas y escrituras, déjalo apagado y usa <code>:W</code>.</p>
           </fieldset>
           <details class="advanced"><summary>Condiciones iniciales</summary>
             <label for="initial">Memoria inicial (opcional)</label><textarea id="initial" rows="2" spellcheck="false" placeholder="Vacío = todos los marcos libres"></textarea>
@@ -81,7 +83,7 @@
             <div class="section-label"><span class="step-dot">02</span><h2 id="detail-title">Qué ocurre en este paso</h2><span id="detail-status" class="status"></span></div>
             <div id="detail-body"></div>
           </section>
-          <details class="panel rules"><summary>Reglas usadas y cómo leer el resultado</summary><div id="rules-content"></div><p>«Rendimiento» aquí significa porcentaje de aciertos, según los ejercicios de clase. No es una medida del tiempo real de un sistema operativo.</p><p>Reloj y Segunda oportunidad pueden producir la misma secuencia de reemplazos con condiciones equivalentes. Eso es esperable. NRU depende de sus bits y de la regla de desempate.</p></details>
+          <details class="panel rules"><summary>Reglas usadas y cómo leer el resultado</summary><div id="rules-content"></div><p>«Rendimiento» aquí significa porcentaje de aciertos, según los ejercicios de clase. No es una medida del tiempo real de un sistema operativo.</p><p>En la convención del curso, Segunda oportunidad carga con R=0 y Reloj con R=1; por eso no deben forzarse a producir la misma tabla. NRU depende de los bits, reinicios y desempate indicados.</p></details>
         </div>
       </div>
     </div>
